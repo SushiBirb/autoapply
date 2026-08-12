@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autoapply"
+version = "0.1.0"
+description = "Local-first job application automation (review-before-submit)"
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.1",
+    "rich>=13.0",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+browser = ["playwright>=1.50"]
+llm = ["google-genai>=1.0"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+autoapply = "autoapply.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["autoapply*"]
