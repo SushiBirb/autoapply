@@ -249,12 +249,55 @@ def apply(url: str, headless: bool, review: bool, auto_submit: bool) -> None:
             filler = FormFiller(page, prof)
             n_inputs = filler.fill_input_fields()
             n_choices = filler.fill_radio_and_selects()
-            has_file = filler.handle_file_uploads()
-
             ui.success(f"Form filling complete: {n_inputs} input fields, {n_choices} radio choices, file upload: {has_file}")
             if review:
                 ui.info("[Review Mode] Review filled form in browser window. Press Enter when done...")
                 input()
+
+
+@main.command()
+@click.option("--keywords", default="Cybersecurity Intern", help="Job search keywords (e.g. 'InfoSec Intern').")
+@click.option("--location", default="", help="Target location (e.g. 'Louisville, KY').")
+@click.option("--easy-apply", is_flag=True, default=True, help="Filter for LinkedIn Easy Apply postings.")
+@click.option("--limit", default=10, help="Max jobs to discover.")
+@click.option("--headless", is_flag=True, help="Run browser in headless mode.")
+@click.option("--apply-now", is_flag=True, help="Sequentially auto-fill discovered jobs after search.")
+def discover(keywords: str, location: str, easy_apply: bool, limit: int, headless: bool, apply_now: bool) -> None:
+    """Discover matching job postings on LinkedIn and optionally batch auto-apply."""
+    from .browser import JobDiscoveryEngine, launch_browser_session
+    from .adapters import LinkedInEasyApplyAdapter
+
+    try:
+        prof = load_profile()
+    except FileNotFoundError as exc:
+        ui.error(str(exc))
+        sys.exit(1)
+
+    with launch_browser_session(headless=headless) as (context, page):
+        discovery = JobDiscoveryEngine(page)
+        jobs = discovery.search_linkedin(keywords=keywords, location=location, easy_apply_only=easy_apply, limit=limit)
+
+        if not jobs:
+            ui.warn("No jobs found matching criteria.")
+            return
+
+        table = Table(title=f"Discovered Job Postings ({len(jobs)})")
+        table.add_column("#", style="dim")
+        table.add_column("Company")
+        table.add_column("Title")
+        table.add_column("Location")
+        table.add_column("URL")
+
+        for idx, j in enumerate(jobs, 1):
+            table.add_row(str(idx), j["company"], j["title"], j["location"], j["url"])
+        ui.console.print(table)
+
+        if apply_now or ui.confirm(f"Batch fill applications for these {len(jobs)} jobs now?", default=False):
+            ui.section("Batch Application Auto-Fill")
+            adapter = LinkedInEasyApplyAdapter(page, prof)
+            for j in jobs:
+                ui.info(f"\n---> Applying to: {j['company']} — {j['title']}")
+                adapter.apply(j["url"], review=True)
 
 
 if __name__ == "__main__":
