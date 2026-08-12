@@ -87,6 +87,16 @@ RESUME_SEED = {
     ],
     "projects": [
         {
+            "name": "autoapply (Local-First Application Automation System)",
+            "role": "Developer",
+            "dates": "2026",
+            "bullets": [
+                "Architected a Python CLI tool using Playwright browser automation and Google Gemini AI for automated form filling with human-in-the-loop review.",
+                "Integrated Google Gemini AI SDK via OAuth 2.0 / ADC to generate candidate screening responses based on resume context.",
+                "Implemented embedded SQLite tracking database with conversion metrics and encrypted file permissions (0o600).",
+            ],
+        },
+        {
             "name": "Enterprise Network Simulation (Home Lab)",
             "dates": "2024 - 2025",
             "bullets": [
@@ -114,22 +124,22 @@ RESUME_SEED = {
     ],
     "preferences": {
         "target_roles": [
-            "InfoSec Intern",
-            "Network Engineering Intern",
-            "Cybersecurity Intern",
-            "IT Security Intern",
-            "Security Operations Center (SOC) Intern",
+            "InfoSec Intern / Co-op / Associate",
+            "Network Engineering Intern / Co-op / Associate",
+            "Cybersecurity Intern / Co-op / Associate",
+            "IT Security Specialist",
+            "Security Operations Center (SOC) Analyst",
         ],
         "remote_preference": "open",
         "willing_relocate": True,
     },
     "screening_answers": {
         "tell_me_about_yourself_short": "",
-        "notice_period": "immediate (available for Summer 2026 internship)",
+        "notice_period": "immediate / open for Summer Co-op, Internship, or Full-Time positions",
     },
     "meta": {
         "version": 1,
-        "target_season": "Summer 2026",
+        "target_season": "Summer Co-op / Internship / Full-Time Entry-Level",
     },
 }
 

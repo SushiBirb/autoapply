@@ -23,7 +23,7 @@ def test_seeded_profile():
     assert prof["identity"]["email"] == "jmattingly@proitserv.com"
     assert "certifications" in prof
     assert "CompTIA Security+" in prof["certifications"]
-    assert "InfoSec Intern" in prof["preferences"]["target_roles"]
+    assert any("InfoSec" in r for r in prof["preferences"]["target_roles"])
 
 
 def test_save_and_load_profile(tmp_path: Path):
