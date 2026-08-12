@@ -42,7 +42,8 @@ class JobDiscoveryEngine:
         search_url = f"https://www.linkedin.com/jobs/search/?{query_str}"
 
         section(f"Searching LinkedIn Jobs: {clean_kw} ({location or 'Any Location'})")
-        if not self.page.query_selector(".jobs-search-results__list-item, .job-card-container, li.base-card") and "about:blank" not in self.page.url:
+        # Always navigate if current page does not already contain job listing cards
+        if not self.page.query_selector(".jobs-search-results__list-item, .job-card-container, li.base-card, a[href*='/jobs/view/']"):
             info(f"Navigating to {search_url}")
             try:
                 self.page.goto(search_url, wait_until="domcontentloaded")
