@@ -41,3 +41,15 @@ def test_cli_stats(tmp_data_dir):
     stats_res = runner.invoke(main, ["stats"])
     assert stats_res.exit_code == 0
     assert "Total applied: 1" in stats_res.output
+
+
+def test_cli_login(monkeypatch):
+    from unittest.mock import MagicMock
+    mock_ctx = MagicMock()
+    mock_page = MagicMock()
+    monkeypatch.setattr("autoapply.browser.launch_browser_session", lambda headless=False: MagicMock(__enter__=lambda s: (mock_ctx, mock_page), __exit__=lambda s, a, b, c: None))
+    
+    runner = CliRunner()
+    res = runner.invoke(main, ["login"], input="\n")
+    assert res.exit_code == 0
+    assert "Session state saved" in res.output

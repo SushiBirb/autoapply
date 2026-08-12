@@ -224,6 +224,23 @@ def open_url(app_id) -> None:
 
 
 @main.command()
+@click.option("--site", default="linkedin", help="Site to log into (default: linkedin).")
+def login(site: str) -> None:
+    """Open persistent Chromium browser window to log into LinkedIn or job portals."""
+    from .browser import launch_browser_session
+    target_url = "https://www.linkedin.com/login" if site.lower() == "linkedin" else site
+    ui.section("Persistent Session Browser Login")
+    ui.info(f"Opening browser window to: {target_url}")
+    ui.info("Log in with your credentials in the browser window. Session cookies will be saved automatically.")
+    with launch_browser_session(headless=False) as (context, page):
+        page.goto(target_url, wait_until="domcontentloaded")
+        ui.info("[Interactive Mode] Log into your account in the opened browser window.")
+        ui.info("Press Enter in this terminal once you are logged in...")
+        input()
+    ui.success("Session state saved to persistent browser profile!")
+
+
+@main.command()
 @click.option("--url", required=True, help="Job application URL.")
 @click.option("--headless", is_flag=True, help="Run browser in headless mode.")
 @click.option("--review/--no-review", default=True, help="Pause on final review modal before submitting.")
