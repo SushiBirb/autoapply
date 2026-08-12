@@ -395,7 +395,7 @@ def discover(keywords: str | None, location: str, easy_apply: bool, exp_level: s
             adapter = LinkedInEasyApplyAdapter(page, prof)
             for j in all_jobs:
                 ui.info(f"\n---> Applying to: {j['company']} — {j['title']}")
-                adapter.apply(j["url"], review=True)
+                adapter.apply(j["url"], company=j.get("company", ""), title=j.get("title", ""), review=True)
 
 
 if __name__ == "__main__":

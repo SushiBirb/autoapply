@@ -18,7 +18,7 @@ class LinkedInEasyApplyAdapter(BaseAdapter):
     def can_handle(cls, url: str) -> bool:
         return "linkedin.com" in url.lower()
 
-    def apply(self, url: str, review: bool = True, auto_submit: bool = False) -> dict[str, Any]:
+    def apply(self, url: str, company: str = "", title: str = "", review: bool = True, auto_submit: bool = False) -> dict[str, Any]:
         if url and not url.startswith("about:") and self.page.url != url:
             if not self.page.query_selector(".job-details-jobs-unified-top-card__company-name, .jobs-apply-button"):
                 info(f"Loading LinkedIn posting: {url}")
@@ -28,9 +28,9 @@ class LinkedInEasyApplyAdapter(BaseAdapter):
                 except Exception as exc:
                     warn(f"Navigation note: {exc}")
 
-        company = self._extract_company_name()
-        title = self._extract_job_title()
-        section(f"LinkedIn Easy Apply: {company} — {title}")
+        company = company or self._extract_company_name()
+        title = title or self._extract_job_title()
+        section(f"Job Application: {company} — {title}")
 
         # Check for Easy Apply button vs External Apply button
         easy_apply_btn = self._find_easy_apply_button()
@@ -69,6 +69,19 @@ class LinkedInEasyApplyAdapter(BaseAdapter):
             info(f"Loaded external career portal: {target_page.url}")
             filler = FormFiller(target_page, self.profile)
             n_inputs = filler.fill_input_fields()
+
+            # If 0 inputs found on landing page, click embedded Apply button/link on external page
+            if n_inputs == 0:
+                apply_trigger = target_page.query_selector("a[href*='apply'], button:has-text('Apply'), a:has-text('Apply'), button[aria-label*='Apply']")
+                if apply_trigger and apply_trigger.is_visible():
+                    info("Clicking external career page 'Apply' button to reveal form fields...")
+                    try:
+                        apply_trigger.click()
+                        time.sleep(2)
+                        n_inputs = filler.fill_input_fields()
+                    except Exception as exc:
+                        warn(f"External apply click note: {exc}")
+
             n_radios = filler.fill_radio_and_selects()
             has_file = filler.handle_file_uploads()
 
