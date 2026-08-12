@@ -15,6 +15,8 @@ class FormFiller:
     def __init__(self, page: Page, profile: dict[str, Any]):
         self.page = page
         self.profile = profile
+        from ..llm import GeminiAnswerGenerator
+        self.llm_generator = GeminiAnswerGenerator(profile)
 
     def fill_input_fields(self) -> int:
         """Find and fill standard text, email, tel, address, and text area fields."""
@@ -27,6 +29,10 @@ class FormFiller:
 
             label_text = self._extract_label(elem)
             value_to_fill = self._match_profile_value(label_text, elem)
+
+            # If no direct profile match, check if it's an open-ended screening question
+            if not value_to_fill and (elem.get_attribute("type") == "textarea" or len(label_text) > 15):
+                value_to_fill = self.llm_generator.generate_answer(label_text)
 
             if value_to_fill:
                 current_val = elem.input_value() if elem.get_attribute("type") != "textarea" else elem.inner_text()

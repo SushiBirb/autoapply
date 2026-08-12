@@ -7,6 +7,11 @@ from autoapply.profile.seed import seeded_profile
 from autoapply.tracker.db import Application, ApplicationDB
 
 
+@pytest.fixture(autouse=True)
+def disable_gcloud(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("AUTOAPPLY_DISABLE_GCLOUD", "1")
+
+
 @pytest.fixture
 def tmp_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Fixture providing an isolated temporary data directory."""
