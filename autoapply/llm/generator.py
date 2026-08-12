@@ -146,8 +146,14 @@ Instructions:
         skills = self.profile.get("skills", {})
         certs = self.profile.get("certifications", [])
 
-        # Immediate fallback list derived from resume profile
-        fallback_keywords = list(target_roles[:4]) if target_roles else [
+        # Clean fallback list derived from target roles
+        cleaned_roles = []
+        for r in target_roles:
+            clean_r = r.split("/")[0].strip()
+            if clean_r and clean_r not in cleaned_roles:
+                cleaned_roles.append(clean_r)
+
+        fallback_keywords = cleaned_roles[:4] if cleaned_roles else [
             "Cybersecurity Intern",
             "InfoSec Intern",
             "Network Engineering Intern",
@@ -163,8 +169,11 @@ Instructions:
         - Certifications: {certs}
         - Key Skills: {skills}
 
-        Suggest 3 to 5 highly targeted, effective search keyword phrases for job portals (such as LinkedIn Easy Apply).
-        Return ONLY a comma-separated list of phrases without quotes or extra text. Example: Cybersecurity Intern, InfoSec Intern, Network Engineering Intern
+        Suggest 3 to 4 short, clean job title search terms for job boards (e.g. LinkedIn).
+        CRITICAL RULES:
+        - Do NOT include slashes '/', symbols, or words like 'Easy Apply'.
+        - Use standard simple job titles (e.g., 'Cybersecurity Intern', 'InfoSec Intern', 'Network Engineer').
+        - Return ONLY a comma-separated list of short job titles.
         """
 
         try:
@@ -173,7 +182,11 @@ Instructions:
                 contents=prompt,
             )
             raw_text = res.text.strip()
-            keywords = [k.strip().strip("'\"") for k in raw_text.split(",") if k.strip()]
+            keywords = []
+            for k in raw_text.split(","):
+                k_clean = k.strip().strip("'\"").split("/")[0].strip()
+                if k_clean and k_clean not in keywords:
+                    keywords.append(k_clean)
             if keywords:
                 info(f"  AI generated search keywords from resume: {keywords}")
                 return keywords

@@ -22,6 +22,13 @@ class JobDiscoveryEngine:
         limit: int = 15,
     ) -> list[dict[str, str]]:
         """Search LinkedIn jobs and collect posting URLs matching criteria."""
+        # Sanitize keyword query to avoid slashes or extra filter text in job title input
+        keywords = keywords.split("/")[0]
+        import re
+        keywords = re.sub(r"\b(easy\s*apply|filter)\b", "", keywords, flags=re.IGNORECASE)
+        keywords = re.sub(r"[^\w\s\-]", "", keywords).strip()
+        keywords = " ".join(keywords.split())
+
         params = {"keywords": keywords}
         if location:
             params["location"] = location
