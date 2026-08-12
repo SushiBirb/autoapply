@@ -35,9 +35,20 @@ CREATE TABLE IF NOT EXISTS status_events (
     FOREIGN KEY (application_id) REFERENCES applications(id)
 );
 
+CREATE TABLE IF NOT EXISTS portal_credentials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company TEXT NOT NULL,
+    portal_domain TEXT UNIQUE NOT NULL,
+    email TEXT NOT NULL,
+    password TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_applications_company ON applications(company);
 CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
 CREATE INDEX IF NOT EXISTS idx_status_events_app ON status_events(application_id);
+CREATE INDEX IF NOT EXISTS idx_portal_credentials_domain ON portal_credentials(portal_domain);
 """
 
 
@@ -204,3 +215,98 @@ class ApplicationDB:
     @staticmethod
     def valid_channels() -> tuple[str, ...]:
         return CHANNELS
+
+    def get_or_create_credential(self, company: str, domain: str, email: str) -> dict[str, str]:
+        """Get or generate credentials for a company career portal domain."""
+        import secrets
+        import string
+
+        with _connect(self._path) as conn:
+            row = conn.execute(
+                "SELECT company, portal_domain, email, password FROM portal_credentials WHERE portal_domain = ?",
+                (domain,),
+            ).fetchone()
+            now = datetime.now().isoformat(timespec="seconds")
+
+            if row:
+                conn.execute("UPDATE portal_credentials SET last_used_at = ? WHERE portal_domain = ?", (now, domain))
+                return {
+                    "company": row["company"],
+                    "domain": row["portal_domain"],
+                    "email": row["email"],
+                    "password": row["password"],
+                }
+
+            # Generate strong random password for portal account
+            alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+            rand_suffix = "".join(secrets.choice(alphabet) for _ in range(12))
+            password = f"App!{rand_suffix}"
+
+            conn.execute(
+                "INSERT INTO portal_credentials (company, portal_domain, email, password, created_at, last_used_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (company, domain, email, password, now, now),
+            )
+
+        self.export_credentials_file()
+        return {
+            "company": company,
+            "domain": domain,
+            "email": email,
+            "password": password,
+        }
+
+    def list_credentials(self) -> list[dict[str, str]]:
+        """List all generated portal credentials."""
+        with _connect(self._path) as conn:
+            rows = conn.execute(
+                "SELECT company, portal_domain, email, password, created_at, last_used_at FROM portal_credentials ORDER BY company ASC"
+            ).fetchall()
+            return [
+                {
+                    "company": r["company"],
+                    "domain": r["portal_domain"],
+                    "email": r["email"],
+                    "password": r["password"],
+                    "created_at": r["created_at"],
+                    "last_used_at": r["last_used_at"],
+                }
+                for r in rows
+            ]
+
+    def export_credentials_file(self) -> Path:
+        """Export all portal credentials to an easy-to-read text file (data/portal_credentials.txt)."""
+        from ..config import DATA_DIR
+        file_path = DATA_DIR / "portal_credentials.txt"
+        creds = self.list_credentials()
+
+        lines = [
+            "==================================================================",
+            "                 AUTOAPPLY PORTAL CREDENTIALS LOG                  ",
+            "==================================================================",
+            "This file lists all account credentials generated for external    ",
+            "company career portals (Workday, Taleo, Greenhouse, Lever, etc.). ",
+            "==================================================================",
+            "",
+        ]
+
+        if not creds:
+            lines.append("No portal accounts created yet.")
+        else:
+            for c in creds:
+                lines.append(f"Company:      {c['company']}")
+                lines.append(f"Portal URL:   {c['domain']}")
+                lines.append(f"Login Email:  {c['email']}")
+                lines.append(f"Password:     {c['password']}")
+                lines.append(f"Created At:   {c['created_at']}")
+                lines.append("-" * 66)
+
+        file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        # Set secure file permissions (0o600)
+        try:
+            os.chmod(file_path, 0o600)
+        except Exception:
+            pass
+
+        return file_path

@@ -60,9 +60,27 @@ def test_stats_metrics(test_db: ApplicationDB):
     test_db.add(Application(company="CompC", title="RoleC", status="interview"))
     test_db.add(Application(company="CompD", title="RoleD", status="offer"))
 
-    s = test_db.stats()
-    assert s["total"] == 4
-    assert s["responses"] == 3  # phone_screen, interview, offer
-    assert s["offers"] == 1
-    assert s["response_rate"] == 0.75
-    assert s["offer_rate"] == 0.25
+    stats = test_db.stats()
+    assert stats["total"] == 4
+    assert stats["responses"] == 3
+    assert stats["offers"] == 1
+    assert stats["response_rate"] == 0.75
+    assert stats["offer_rate"] == 0.25
+
+
+def test_portal_credentials_creation_and_export(test_db: ApplicationDB, tmp_path):
+    cred1 = test_db.get_or_create_credential(company="Workday / Workday Jobs", domain="workday.com", email="jmattingly@proitserv.com")
+    assert cred1["email"] == "jmattingly@proitserv.com"
+    assert cred1["password"].startswith("App!")
+
+    # Same domain should return same password
+    cred2 = test_db.get_or_create_credential(company="Workday Jobs", domain="workday.com", email="jmattingly@proitserv.com")
+    assert cred2["password"] == cred1["password"]
+
+    all_creds = test_db.list_credentials()
+    assert len(all_creds) == 1
+    assert all_creds[0]["company"] == "Workday / Workday Jobs"
+
+    txt_file = test_db.export_credentials_file()
+    assert txt_file.exists()
+    assert "workday.com" in txt_file.read_text()

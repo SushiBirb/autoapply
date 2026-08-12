@@ -19,23 +19,38 @@ class FormFiller:
         self.llm_generator = GeminiAnswerGenerator(profile)
 
     def fill_input_fields(self) -> int:
-        """Find and fill standard text, email, tel, address, and text area fields."""
+        """Find and fill standard text, email, tel, address, password, and text area fields."""
         filled_count = 0
-        inputs = self.page.query_selector_all("input[type='text'], input[type='email'], input[type='tel'], input:not([type]), textarea")
-        
+        inputs = self.page.query_selector_all("input[type='text'], input[type='email'], input[type='tel'], input[type='password'], input:not([type]), textarea")
+
+        # Extract domain & company for portal credential generation
+        page_url = self.page.url or ""
+        domain = page_url.split("/")[2] if "/" in page_url and len(page_url.split("/")) > 2 else "company_portal"
+        company_name = domain.replace("www.", "").split(".")[0].title()
+        user_email = self.profile.get("identity", {}).get("email", "candidate@proitserv.com")
+
         for elem in inputs:
             if not elem.is_visible() or elem.is_disabled():
                 continue
 
             label_text = self._extract_label(elem)
-            value_to_fill = self._match_profile_value(label_text, elem)
+            input_type = elem.get_attribute("type") or ""
+
+            if input_type == "password" or "password" in label_text.lower():
+                from ..tracker.db import ApplicationDB
+                db = ApplicationDB()
+                cred = db.get_or_create_credential(company=company_name, domain=domain, email=user_email)
+                value_to_fill = cred["password"]
+                info(f"  Generated & logged portal password for {company_name} ({domain}) -> Saved to data/portal_credentials.txt")
+            else:
+                value_to_fill = self._match_profile_value(label_text, elem)
 
             # If no direct profile match, check if it's an open-ended screening question
-            if not value_to_fill and (elem.get_attribute("type") == "textarea" or len(label_text) > 15):
+            if not value_to_fill and (input_type == "textarea" or len(label_text) > 15):
                 value_to_fill = self.llm_generator.generate_answer(label_text)
 
             if value_to_fill:
-                current_val = elem.input_value() if elem.get_attribute("type") != "textarea" else elem.inner_text()
+                current_val = elem.input_value() if input_type != "textarea" else elem.inner_text()
                 if not current_val.strip():
                     elem.fill(str(value_to_fill))
                     filled_count += 1

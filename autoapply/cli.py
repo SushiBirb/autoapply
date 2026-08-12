@@ -272,10 +272,44 @@ def apply(url: str, headless: bool, review: bool, auto_submit: bool) -> None:
                 input()
 
 
+@main.group()
+def credentials() -> None:
+    """Manage generated company career portal login accounts & passwords."""
+
+
+@credentials.command("list")
+def credentials_list() -> None:
+    """List all auto-generated company portal login credentials."""
+    db = ApplicationDB()
+    creds = db.list_credentials()
+    if not creds:
+        ui.info("No portal credentials saved yet. Log file is at data/portal_credentials.txt.")
+        return
+
+    table = Table(title=f"Saved Portal Credentials ({len(creds)})")
+    table.add_column("Company")
+    table.add_column("Portal Domain")
+    table.add_column("Login Email")
+    table.add_column("Password", style="green")
+    table.add_column("Created At", style="dim")
+
+    for c in creds:
+        table.add_row(c["company"], c["domain"], c["email"], c["password"], c["created_at"])
+    ui.console.print(table)
+
+
+@credentials.command("path")
+def credentials_path() -> None:
+    """Print the location of the easy-to-read portal_credentials.txt file."""
+    db = ApplicationDB()
+    p = db.export_credentials_file()
+    ui.info(str(p))
+
+
 @main.command()
 @click.option("--keywords", default=None, help="Job search keywords. If omitted, keywords are auto-generated from your resume.")
 @click.option("--location", default="", help="Target location (e.g. 'Louisville, KY').")
-@click.option("--easy-apply", is_flag=True, default=True, help="Filter for LinkedIn Easy Apply postings.")
+@click.option("--easy-apply/--all", default=True, help="Filter for Easy Apply only or include external company website portals.")
 @click.option("--exp-level", default="1,2", help="Experience level filter: 1=Internship, 2=Entry Level, 1,2=Both (default).")
 @click.option("--limit", default=10, help="Max jobs to discover.")
 @click.option("--headless", is_flag=True, help="Run browser in headless mode.")
