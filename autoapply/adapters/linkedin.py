@@ -32,18 +32,75 @@ class LinkedInEasyApplyAdapter(BaseAdapter):
         title = self._extract_job_title()
         section(f"LinkedIn Easy Apply: {company} — {title}")
 
-        # Find Easy Apply button
-        apply_btn = self._find_easy_apply_button()
-        if not apply_btn:
-            warn("Easy Apply button not found on page. (Posting may require external site application).")
+        # Check for Easy Apply button vs External Apply button
+        easy_apply_btn = self._find_easy_apply_button()
+        external_apply_btn = self._find_external_apply_button() if not easy_apply_btn else None
+
+        if not easy_apply_btn and not external_apply_btn:
+            warn("No Apply button found on page.")
             return {
                 "company": company,
                 "title": title,
                 "platform": "linkedin",
-                "status": "external_required",
+                "status": "apply_button_missing",
                 "url": url,
             }
 
+        # Handle External Company Site Redirect
+        if external_apply_btn:
+            info("Easy Apply modal not present. Found external company career portal link.")
+            info("Clicking external application link...")
+            
+            # Catch new tab or page redirection
+            with self.page.context.expect_page(timeout=5000) as page_info:
+                try:
+                    external_apply_btn.click()
+                except Exception:
+                    pass
+            
+            try:
+                target_page = page_info.value
+            except Exception:
+                target_page = self.page.context.pages[-1] if len(self.page.context.pages) > 1 else self.page
+
+            target_page.wait_for_load_state("domcontentloaded")
+            time.sleep(2)
+
+            info(f"Loaded external career portal: {target_page.url}")
+            filler = FormFiller(target_page, self.profile)
+            n_inputs = filler.fill_input_fields()
+            n_radios = filler.fill_radio_and_selects()
+            has_file = filler.handle_file_uploads()
+
+            success(f"External form filled: {n_inputs} input fields, {n_radios} radio choices, resume attached: {has_file}")
+            if review:
+                info("[Review Mode] Review filled external application in browser. Press Enter when done...")
+
+            # Log to tracker DB
+            app = Application(
+                company=company,
+                title=title,
+                platform="external_website",
+                channel="company_website",
+                url=target_page.url or url,
+                status="submitted" if auto_submit else "draft",
+                notes="Applied via external company career site automation",
+            )
+            db = ApplicationDB()
+            app_id = db.add(app)
+            success(f"Logged application #{app_id}: {company} — {title} [external_website]")
+
+            return {
+                "id": app_id,
+                "company": company,
+                "title": title,
+                "platform": "external_website",
+                "status": "submitted" if auto_submit else "draft",
+                "url": target_page.url or url,
+            }
+
+        # Handle LinkedIn Easy Apply Modal
+        apply_btn = easy_apply_btn
         info("Clicking Easy Apply...")
         apply_btn.click()
         time.sleep(2)
@@ -156,9 +213,23 @@ class LinkedInEasyApplyAdapter(BaseAdapter):
 
     def _find_easy_apply_button(self) -> Any | None:
         selectors = [
-            ".jobs-apply-button",
             "button[aria-label*='Easy Apply']",
             "button:has-text('Easy Apply')",
+        ]
+        for sel in selectors:
+            btn = self.page.query_selector(sel)
+            if btn and btn.is_visible():
+                return btn
+        return None
+
+    def _find_external_apply_button(self) -> Any | None:
+        selectors = [
+            "button[aria-label*='company website']",
+            "a[aria-label*='company website']",
+            "button.jobs-apply-button",
+            "a.jobs-apply-button",
+            "button:has-text('Apply')",
+            "a:has-text('Apply')",
         ]
         for sel in selectors:
             btn = self.page.query_selector(sel)
