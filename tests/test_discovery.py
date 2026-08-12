@@ -37,8 +37,11 @@ def test_job_discovery_on_synthetic_search_page(tmp_path: Path):
     </html>
     """
 
+    import urllib.parse
+    data_url = "data:text/html;charset=utf-8," + urllib.parse.quote(synthetic_search_html)
+
     with launch_browser_session(user_data_dir=profile_dir, headless=True) as (context, page):
-        page.set_content(synthetic_search_html)
+        page.goto(data_url)
         discovery = JobDiscoveryEngine(page)
 
         # Discovered listings from synthetic DOM
