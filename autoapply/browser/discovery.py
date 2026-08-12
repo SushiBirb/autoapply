@@ -59,8 +59,10 @@ class JobDiscoveryEngine:
         results: list[dict[str, str]] = []
         seen_urls: set[str] = set()
 
-        # Strategy 1: Container cards
+        # Strategy 1: Container cards with live clicking & description screening
         job_cards = self.page.query_selector_all(".job-card-container, .jobs-search-results__list-item, li.base-card, .job-search-card")
+
+        from ..llm.screening import screen_job_qualification
 
         for card in job_cards:
             if len(results) >= limit:
@@ -82,6 +84,27 @@ class JobDiscoveryEngine:
                     company_name = company_elem.inner_text().strip() if company_elem else "Unknown Company"
                     job_loc = loc_elem.inner_text().strip() if loc_elem else (location or "")
 
+                    # Click on job card in list panel to load right detail pane
+                    description = ""
+                    try:
+                        if not self.page.url.startswith("data:"):
+                            card.scroll_into_view_if_needed()
+                            link_elem.click()
+                            time.sleep(1.0)
+
+                        desc_elem = self.page.query_selector(".jobs-search__job-details, .jobs-description-content, .jobs-description__content, #job-details, article")
+                        if desc_elem and desc_elem.inner_text().strip():
+                            description = desc_elem.inner_text().strip()
+                    except Exception as exc:
+                        warn(f"Card selection note: {exc}")
+
+                    # Screen qualification from description text
+                    screening = screen_job_qualification(job_title, company_name, description)
+                    if not screening["qualified"]:
+                        warn(f"  [Skipped {screening['score']}% Match] {company_name} — {job_title} ({screening['reason']})")
+                        continue
+
+                    success(f"  [Qualified {screening['score']}% Match] {company_name} — {job_title}")
                     results.append({
                         "title": job_title,
                         "company": company_name,
