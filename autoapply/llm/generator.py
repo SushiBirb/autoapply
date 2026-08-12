@@ -139,3 +139,45 @@ Instructions:
             )
 
         return answers.get("tell_me_about_yourself_short") or "Available for Summer 2026 internship."
+
+    def suggest_search_keywords(self) -> list[str]:
+        """Analyze resume profile and suggest targeted job search keywords."""
+        target_roles = self.profile.get("preferences", {}).get("target_roles", [])
+        skills = self.profile.get("skills", {})
+        certs = self.profile.get("certifications", [])
+
+        # Immediate fallback list derived from resume profile
+        fallback_keywords = list(target_roles[:4]) if target_roles else [
+            "Cybersecurity Intern",
+            "InfoSec Intern",
+            "Network Engineering Intern",
+            "IT Security Specialist",
+        ]
+
+        if not self.client:
+            return fallback_keywords
+
+        prompt = f"""
+        You are a career recruitment advisor. Based on this candidate's resume profile:
+        - Target Roles: {target_roles}
+        - Certifications: {certs}
+        - Key Skills: {skills}
+
+        Suggest 3 to 5 highly targeted, effective search keyword phrases for job portals (such as LinkedIn Easy Apply).
+        Return ONLY a comma-separated list of phrases without quotes or extra text. Example: Cybersecurity Intern, InfoSec Intern, Network Engineering Intern
+        """
+
+        try:
+            res = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+            )
+            raw_text = res.text.strip()
+            keywords = [k.strip().strip("'\"") for k in raw_text.split(",") if k.strip()]
+            if keywords:
+                info(f"  AI generated search keywords from resume: {keywords}")
+                return keywords
+        except Exception as exc:
+            warn(f"  AI keyword generation note: {exc}. Using profile defaults.")
+
+        return fallback_keywords

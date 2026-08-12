@@ -256,16 +256,17 @@ def apply(url: str, headless: bool, review: bool, auto_submit: bool) -> None:
 
 
 @main.command()
-@click.option("--keywords", default="Cybersecurity Intern", help="Job search keywords (e.g. 'InfoSec Intern').")
+@click.option("--keywords", default=None, help="Job search keywords. If omitted, keywords are auto-generated from your resume.")
 @click.option("--location", default="", help="Target location (e.g. 'Louisville, KY').")
 @click.option("--easy-apply", is_flag=True, default=True, help="Filter for LinkedIn Easy Apply postings.")
 @click.option("--limit", default=10, help="Max jobs to discover.")
 @click.option("--headless", is_flag=True, help="Run browser in headless mode.")
 @click.option("--apply-now", is_flag=True, help="Sequentially auto-fill discovered jobs after search.")
-def discover(keywords: str, location: str, easy_apply: bool, limit: int, headless: bool, apply_now: bool) -> None:
-    """Discover matching job postings on LinkedIn and optionally batch auto-apply."""
+def discover(keywords: str | None, location: str, easy_apply: bool, limit: int, headless: bool, apply_now: bool) -> None:
+    """Discover matching job postings on LinkedIn based on resume context or custom keywords."""
     from .browser import JobDiscoveryEngine, launch_browser_session
     from .adapters import LinkedInEasyApplyAdapter
+    from .llm import GeminiAnswerGenerator
 
     try:
         prof = load_profile()
@@ -273,29 +274,54 @@ def discover(keywords: str, location: str, easy_apply: bool, limit: int, headles
         ui.error(str(exc))
         sys.exit(1)
 
+    search_queries: list[str] = []
+    if keywords:
+        search_queries = [keywords]
+    else:
+        ui.info("Analyzing resume profile to generate optimal job search keywords...")
+        gen = GeminiAnswerGenerator(prof)
+        search_queries = gen.suggest_search_keywords()
+        ui.success(f"Generated search queries from resume: {', '.join(search_queries)}")
+
+    all_jobs: list[dict[str, str]] = []
+    seen_urls: set[str] = set()
+
     with launch_browser_session(headless=headless) as (context, page):
         discovery = JobDiscoveryEngine(page)
-        jobs = discovery.search_linkedin(keywords=keywords, location=location, easy_apply_only=easy_apply, limit=limit)
 
-        if not jobs:
+        for query in search_queries:
+            if len(all_jobs) >= limit:
+                break
+            found = discovery.search_linkedin(
+                keywords=query,
+                location=location,
+                easy_apply_only=easy_apply,
+                limit=limit - len(all_jobs),
+            )
+            for j in found:
+                if j["url"] not in seen_urls:
+                    seen_urls.add(j["url"])
+                    all_jobs.append(j)
+
+        if not all_jobs:
             ui.warn("No jobs found matching criteria.")
             return
 
-        table = Table(title=f"Discovered Job Postings ({len(jobs)})")
+        table = Table(title=f"Discovered Job Postings ({len(all_jobs)})")
         table.add_column("#", style="dim")
         table.add_column("Company")
         table.add_column("Title")
         table.add_column("Location")
         table.add_column("URL")
 
-        for idx, j in enumerate(jobs, 1):
+        for idx, j in enumerate(all_jobs, 1):
             table.add_row(str(idx), j["company"], j["title"], j["location"], j["url"])
         ui.console.print(table)
 
-        if apply_now or ui.confirm(f"Batch fill applications for these {len(jobs)} jobs now?", default=False):
+        if apply_now or ui.confirm(f"Batch fill applications for these {len(all_jobs)} jobs now?", default=False):
             ui.section("Batch Application Auto-Fill")
             adapter = LinkedInEasyApplyAdapter(page, prof)
-            for j in jobs:
+            for j in all_jobs:
                 ui.info(f"\n---> Applying to: {j['company']} — {j['title']}")
                 adapter.apply(j["url"], review=True)
 

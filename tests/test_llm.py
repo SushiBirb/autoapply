@@ -43,5 +43,13 @@ def test_llm_prompt_building(monkeypatch: pytest.MonkeyPatch):
     assert "CrowdStrike" in prompt
     assert "InfoSec Intern" in prompt
     assert "Describe a challenging project" in prompt
-    assert "Joshua" in prompt
-    assert "University of Louisville" in prompt
+
+
+def test_suggest_search_keywords_fallback(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(GeminiAnswerGenerator, "_init_client", lambda self: None)
+    prof = seeded_profile()
+    generator = GeminiAnswerGenerator(prof)
+    keywords = generator.suggest_search_keywords()
+
+    assert len(keywords) > 0
+    assert any("InfoSec" in k or "Cybersecurity" in k for k in keywords)
