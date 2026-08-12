@@ -227,9 +227,11 @@ def open_url(app_id) -> None:
 @click.option("--url", required=True, help="Job application URL.")
 @click.option("--headless", is_flag=True, help="Run browser in headless mode.")
 @click.option("--review/--no-review", default=True, help="Pause on final review modal before submitting.")
-def apply(url: str, headless: bool, review: bool) -> None:
-    """Launch automated browser form filling for a job posting URL."""
+@click.option("--auto-submit", is_flag=True, help="Automatically submit without pausing for review.")
+def apply(url: str, headless: bool, review: bool, auto_submit: bool) -> None:
+    """Launch automated application form filling for a job posting URL."""
     from .browser import FormFiller, launch_browser_session
+    from .adapters import LinkedInEasyApplyAdapter
     try:
         prof = load_profile()
     except FileNotFoundError as exc:
@@ -238,17 +240,21 @@ def apply(url: str, headless: bool, review: bool) -> None:
 
     ui.section(f"Navigating to {url}")
     with launch_browser_session(headless=headless) as (context, page):
-        page.goto(url, wait_until="domcontentloaded")
-        ui.info("Page loaded. Analyzing form fields...")
-        filler = FormFiller(page, prof)
-        n_inputs = filler.fill_input_fields()
-        n_choices = filler.fill_radio_and_selects()
-        has_file = filler.handle_file_uploads()
+        if LinkedInEasyApplyAdapter.can_handle(url):
+            adapter = LinkedInEasyApplyAdapter(page, prof)
+            adapter.apply(url, review=review, auto_submit=auto_submit)
+        else:
+            page.goto(url, wait_until="domcontentloaded")
+            ui.info("Page loaded. Analyzing form fields...")
+            filler = FormFiller(page, prof)
+            n_inputs = filler.fill_input_fields()
+            n_choices = filler.fill_radio_and_selects()
+            has_file = filler.handle_file_uploads()
 
-        ui.success(f"Form filling complete: {n_inputs} input fields, {n_choices} radio choices, file upload: {has_file}")
-        if review:
-            ui.info("[Review Mode] Review filled form in browser window. Press Enter when done...")
-            input()
+            ui.success(f"Form filling complete: {n_inputs} input fields, {n_choices} radio choices, file upload: {has_file}")
+            if review:
+                ui.info("[Review Mode] Review filled form in browser window. Press Enter when done...")
+                input()
 
 
 if __name__ == "__main__":
