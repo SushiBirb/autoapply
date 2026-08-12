@@ -25,10 +25,9 @@ class GeminiAnswerGenerator:
         self.client = self._init_client()
 
     def _init_client(self) -> Any | None:
-        """Initialize google.genai Client with API Key, OAuth token, or ADC."""
+        """Initialize google.genai Client with API Key, OAuth token, or Vertex AI ADC."""
         try:
             from google import genai
-            from google.genai import types
         except ImportError:
             warn("google-genai package not installed.")
             return None
@@ -38,36 +37,22 @@ class GeminiAnswerGenerator:
             info(f"  Initialized Gemini client via API Key (Model: {self.model_name})")
             return genai.Client(api_key=api_key)
 
-        # Check OAuth token or gcloud CLI auth for Google AI One Subscription
-        oauth_token = os.environ.get("GOOGLE_OAUTH_TOKEN") or os.environ.get("GEMINI_OAUTH_TOKEN")
-        if not oauth_token and shutil.which("gcloud") and not os.environ.get("AUTOAPPLY_DISABLE_GCLOUD"):
-            try:
-                res = subprocess.run(
-                    ["gcloud", "auth", "application-default", "print-access-token"],
-                    capture_output=True, text=True, timeout=1
-                )
-                if res.returncode == 0 and res.stdout.strip():
-                    oauth_token = res.stdout.strip()
-            except Exception:
-                pass
-
-        if oauth_token:
-            info(f"  Initialized Gemini client via OAuth Token / Google AI One Sub (Model: {self.model_name})")
-            # Construct Client with Credentials
-            try:
-                import google.oauth2.credentials
-                creds = google.oauth2.credentials.Credentials(token=oauth_token)
-                return genai.Client(credentials=creds)
-            except Exception as exc:
-                warn(f"  OAuth credentials setup failed: {exc}")
-
-        # Fallback check for Application Default Credentials (ADC) if explicitly enabled
+        # Check for Google Cloud Vertex AI ADC or OAuth credentials
         if not os.environ.get("AUTOAPPLY_DISABLE_GCLOUD"):
             try:
                 import google.auth
+                import google.auth.transport.requests
                 credentials, project = google.auth.default()
-                info("  Initialized Gemini client via Application Default Credentials (ADC)")
-                return genai.Client(credentials=credentials)
+                if credentials:
+                    if not credentials.valid:
+                        try:
+                            credentials.refresh(google.auth.transport.requests.Request())
+                        except Exception:
+                            pass
+                    # Attempt Vertex AI initialization with ADC credentials
+                    if project:
+                        info(f"  Initialized Gemini client via Vertex AI ADC (Project: {project})")
+                        return genai.Client(vertexai=True, project=project, location="us-central1", credentials=credentials)
             except Exception:
                 pass
 
