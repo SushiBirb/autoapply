@@ -27,6 +27,11 @@ def get_resume_dir() -> Path:
 def get_audit_log_path() -> Path:
     return get_data_dir() / "audit.log"
 
+def get_browser_profile_dir() -> Path:
+    d = get_data_dir() / "browser_profile"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
 class _ConfigProxy:
     @property
     def DATA_DIR(self) -> Path:
@@ -52,6 +57,10 @@ class _ConfigProxy:
     def AUDIT_LOG(self) -> Path:
         return get_audit_log_path()
 
+    @property
+    def BROWSER_PROFILE_DIR(self) -> Path:
+        return get_browser_profile_dir()
+
 _proxy = _ConfigProxy()
 DATA_DIR = _proxy.DATA_DIR
 PROFILE_PATH = _proxy.PROFILE_PATH
@@ -59,6 +68,7 @@ ANSWERS_PATH = _proxy.ANSWERS_PATH
 DB_PATH = _proxy.DB_PATH
 RESUME_DIR = _proxy.RESUME_DIR
 AUDIT_LOG = _proxy.AUDIT_LOG
+BROWSER_PROFILE_DIR = _proxy.BROWSER_PROFILE_DIR
 
 
 PROFILE_MODE = 0o600
