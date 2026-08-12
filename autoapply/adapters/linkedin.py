@@ -32,6 +32,23 @@ class LinkedInEasyApplyAdapter(BaseAdapter):
         title = title or self._extract_job_title()
         section(f"Job Application: {company} — {title}")
 
+        # AI & Heuristic Qualification Screening
+        from ..llm.screening import screen_job_qualification
+        description = self._extract_job_description()
+        screening = screen_job_qualification(title, company, description, self.profile)
+        if not screening["qualified"]:
+            warn(f"[Screening] SKIP ({screening['score']}% match): {screening['reason']}")
+            return {
+                "company": company,
+                "title": title,
+                "platform": "linkedin",
+                "status": "skipped_unqualified",
+                "url": url,
+                "reason": screening["reason"],
+            }
+        else:
+            success(f"[Screening] MATCH ({screening['score']}% match): {screening['reason']}")
+
         # Check for Easy Apply button vs External Apply button
         easy_apply_btn = self._find_easy_apply_button()
         external_apply_btn = self._find_external_apply_button() if not easy_apply_btn else None
@@ -223,6 +240,20 @@ class LinkedInEasyApplyAdapter(BaseAdapter):
             if elem and elem.inner_text().strip():
                 return elem.inner_text().strip()
         return "Unknown Role"
+
+    def _extract_job_description(self) -> str:
+        selectors = [
+            ".job-details-jobs-unified-description__content",
+            ".jobs-description__content",
+            "#job-details",
+            ".description__text",
+            "article",
+        ]
+        for sel in selectors:
+            elem = self.page.query_selector(sel)
+            if elem and elem.inner_text().strip():
+                return elem.inner_text().strip()
+        return ""
 
     def _find_easy_apply_button(self) -> Any | None:
         selectors = [

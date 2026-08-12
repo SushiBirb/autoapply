@@ -74,7 +74,21 @@ BROWSER_PROFILE_DIR = _proxy.BROWSER_PROFILE_DIR
 PROFILE_MODE = 0o600
 DB_MODE = 0o600
 
-DEFAULT_RESUME_PATH = Path.home() / "2026-Q3-condensed.pdf"
+
+def get_default_resume_path() -> Path:
+    candidates = [
+        Path("/home/scushi/work/2026-Q3-condensed.pdf"),
+        Path("/home/scushi/work/2026-Q3.pdf"),
+        get_data_dir() / "resume" / "resume.pdf",
+        Path.home() / "2026-Q3-condensed.pdf",
+        Path.home() / "work" / "2026-Q3-condensed.pdf",
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    return candidates[0]
+
+DEFAULT_RESUME_PATH = get_default_resume_path()
 
 PLATFORMS = (
     "greenhouse",
